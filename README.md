@@ -38,6 +38,9 @@ This server wraps the YouTube Live Streaming API v3 and exposes it as MCP tools.
 - `yt-get-broadcast-status` — Broadcast lifecycle state
 - `yt-get-stream-health` — Real-time stream health
 
+**Videos**
+- `yt-search-videos` — Search YouTube for videos by keyword. Params: `query` (required), `maxResults` (1–50, default 10), `channelId` (optional, restrict to one channel), `order` (relevance/date/viewCount/rating/title, default relevance). Returns `{ videoId, title, channelTitle, channelId, publishedAt, url, description }` per result. Note: `search.list` costs **100 quota units** per call (vs ~1 for list/get).
+
 ## Prerequisites
 
 1. **Node.js 18+**
@@ -113,6 +116,8 @@ To end: `yt-transition-broadcast complete` + `obs-stop-stream`
 ## API Quota
 
 YouTube API has a daily quota of 10,000 units. Read operations cost ~1 unit, write operations cost ~50 units. Normal streaming use stays well within limits.
+
+One exception: `search.list` (used by `yt-search-videos`) costs **100 units per call** — about 100 searches per day on the default quota. When the quota is spent, search tools return a clear `quotaExceeded` message; prefer `yt-list-videos` (by channel) for cheap listing.
 
 ## License
 
