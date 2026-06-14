@@ -145,6 +145,31 @@ export class YouTubeLiveClient {
     return item;
   }
 
+  // NOTE: search.list costs 100 quota units per call (vs ~1 for list/get). The
+  // default daily quota is 10,000 units, i.e. ~100 searches/day — use sparingly.
+  async searchVideos(params: { query: string; maxResults?: number; channelId?: string; order?: string }): Promise<Array<{ videoId: string; title: string; channelTitle: string; channelId: string; publishedAt: string; url: string; description: string }>> {
+    const res = await this.youtube.search.list({
+      part: ["snippet"],
+      q: params.query,
+      type: ["video"],
+      maxResults: params.maxResults || 10,
+      order: params.order || "relevance",
+      ...(params.channelId ? { channelId: params.channelId } : {}),
+    });
+    return (res.data.items || []).map((item) => {
+      const videoId = item.id?.videoId || "";
+      return {
+        videoId,
+        title: item.snippet?.title || "",
+        channelTitle: item.snippet?.channelTitle || "",
+        channelId: item.snippet?.channelId || "",
+        publishedAt: item.snippet?.publishedAt || "",
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        description: item.snippet?.description || "",
+      };
+    });
+  }
+
   async updateVideo(params: { videoId: string; title?: string; description?: string; tags?: string[]; categoryId?: string; privacyStatus?: string; madeForKids?: boolean; commentability?: string }): Promise<youtube_v3.Schema$Video> {
     const current = await this.getVideo(params.videoId);
     const res = await this.youtube.videos.update({

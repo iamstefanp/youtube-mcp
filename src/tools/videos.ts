@@ -5,6 +5,15 @@ import { YouTubeLiveClient } from "../client.js";
 const j = (o: any) => JSON.stringify(o, null, 2);
 const err = (e: any) => ({ content: [{ type: "text" as const, text: `Error: ${e.message}` }], isError: true as const });
 
+// search.list returns HTTP 403 with reason "quotaExceeded" when the daily quota
+// is spent. Surface a clear, actionable message instead of a raw API error.
+const isQuotaError = (e: any): boolean =>
+  e?.code === 403 && JSON.stringify(e?.errors ?? e?.message ?? "").includes("quotaExceeded");
+const quotaErr = () => ({
+  content: [{ type: "text" as const, text: "YouTube search quota exceeded (search.list costs 100 units; daily default 10,000). Try again after quota reset or use yt-list-videos by channel." }],
+  isError: true as const,
+});
+
 export function initialize(server: McpServer, client: YouTubeLiveClient): void {
   server.tool("yt-list-videos", "List videos uploaded to a channel", {
     channelId: z.string().optional().describe("Channel ID (defaults to authenticated user's channel)"),
@@ -21,6 +30,16 @@ export function initialize(server: McpServer, client: YouTubeLiveClient): void {
     videoId: z.string().describe("The video ID"),
   }, async ({ videoId }) => {
     try { return { content: [{ type: "text" as const, text: j(await client.getVideo(videoId)) }] }; } catch (e: any) { return err(e); }
+  });
+
+  server.tool("yt-search-videos", "Search YouTube for videos by keyword (costs 100 quota units per call)", {
+    query: z.string().describe("Search keywords"),
+    maxResults: z.number().min(1).max(50).optional().describe("Max results to return, 1-50 (default: 10)"),
+    channelId: z.string().optional().describe("Restrict results to a single channel ID"),
+    order: z.enum(["relevance", "date", "viewCount", "rating", "title"]).optional().describe("Result order (default: relevance)"),
+  }, async (params) => {
+    try { return { content: [{ type: "text" as const, text: j(await client.searchVideos(params)) }] }; }
+    catch (e: any) { return isQuotaError(e) ? quotaErr() : err(e); }
   });
 
   server.tool("yt-update-video", "Update a video's title, description, tags, category, privacy, or comment settings", {
